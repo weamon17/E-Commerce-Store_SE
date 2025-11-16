@@ -63,7 +63,7 @@ async function startServer() {
     // === FIX 1: Sửa PORT ===
     const PORT = process.env.PORT || 5000; // Dùng PORT của Render
     
-    app.listen(PORT, () => {
+    app.listen(PORT, '0.0.0.0', () => {
       console.log(`Server running on port ${PORT}`);
     });
   } catch (err) {
