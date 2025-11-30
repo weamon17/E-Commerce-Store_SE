@@ -26,7 +26,7 @@ const Footer = () => {
             <br />
             Contribute to our project on Github:&nbsp;
             <a
-              href="https://github.com/weamon17/Software-Engineer_E---Commerce-Store.git"
+              href="https://github.com/weamon17/E-Commerce-Store_SE.git"
               // Làm link nổi bật hơn
               className="font-semibold underline hover:opacity-80 transition-opacity"
               target="_blank" rel="noopener noreferrer"
