@@ -13,11 +13,23 @@ import {
 import { CheckUser } from "../Function/CheckUser";
 import { loadInfoOrdersByAdmin } from "../services/handleAPI";
 
-// Hàm gọi API lấy đơn hàng
+// Hàm lấy ngày hiện tại theo định dạng YYYY-MM-DD
+const getCurrentDate = () => {
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = String(today.getMonth() + 1).padStart(2, "0"); 
+  const day = String(today.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
 export default function DashboardAdmin() {
   const [orders, setOrders] = useState([]);
-  const [filterFrom, setFilterFrom] = useState("2025-05-01");
-  const [filterTo, setFilterTo] = useState("2025-05-31");
+  
+  // --- THAY ĐỔI Ở ĐÂY: Dùng hàm getCurrentDate() để lấy ngày hôm nay ---
+  const [filterFrom, setFilterFrom] = useState(getCurrentDate());
+  const [filterTo, setFilterTo] = useState(getCurrentDate());
+  // --------------------------------------------------------------------
+
   const [filteredData, setFilteredData] = useState([]);
 
   // State cho các chỉ số KPI
@@ -44,7 +56,7 @@ export default function DashboardAdmin() {
     fetchOrders();
   }, []);
 
-  // Xử lý dữ liệu: lọc đơn hàng completed, nhóm doanh thu theo ngày, tính tổng sản phẩm và sản phẩm bán chạy
+  // Xử lý dữ liệu
   useEffect(() => {
     if (!filterFrom || !filterTo) {
       setFilteredData([]);
@@ -57,14 +69,12 @@ export default function DashboardAdmin() {
     const fromDate = new Date(filterFrom);
     const toDate = new Date(filterTo);
 
-    // *** FIX: Set toDate tới cuối ngày (23:59:59) ***
-    // Điều này đảm bảo chúng ta bao gồm tất cả các đơn hàng trong ngày được chọn
+    // Set toDate tới cuối ngày (23:59:59)
     toDate.setHours(23, 59, 59, 999);
 
-    // Kiểm tra ngày không hợp lệ (phòng trường hợp 31/11)
     if (isNaN(fromDate.getTime()) || isNaN(toDate.getTime())) {
       console.error("Invalid date range");
-      setFilteredData([]); // Xóa dữ liệu nếu ngày không hợp lệ
+      setFilteredData([]);
       setTotalProductsSold(0);
       setTopProduct(null);
       setTotalRevenue(0);
@@ -75,31 +85,22 @@ export default function DashboardAdmin() {
       if (order.status !== "Completed") return false;
       
       const createdAt = new Date(order.createAt);
-      
-      // Kiểm tra ngày của đơn hàng
-      if (isNaN(createdAt.getTime())) return false; // Bỏ qua đơn hàng có ngày lỗi
+      if (isNaN(createdAt.getTime())) return false;
 
       return createdAt >= fromDate && createdAt <= toDate;
     });
 
-    // Tính doanh thu theo ngày
     const revenueByDateMap = {};
-
-    // Tổng số lượng sản phẩm bán được
     let totalQuantity = 0;
-
-    // Map lưu tổng số lượng theo từng sản phẩm
     const productQuantityMap = {};
 
     filteredOrders.forEach((order) => {
-      // Doanh thu theo ngày
       const dateKey = new Date(order.createAt).toISOString().slice(0, 10);
       if (!revenueByDateMap[dateKey]) {
         revenueByDateMap[dateKey] = 0;
       }
       revenueByDateMap[dateKey] += order.total;
 
-      // Tính tổng sản phẩm & sản phẩm bán chạy
       if (Array.isArray(order.items)) {
         order.items.forEach((item) => {
           totalQuantity += item.buyQuantity;
@@ -112,14 +113,12 @@ export default function DashboardAdmin() {
       }
     });
 
-    // Chuyển map doanh thu sang array để vẽ biểu đồ
     const revenueByDateArray = Object.entries(revenueByDateMap).map(
       ([date, revenue]) => ({ date, revenue })
     );
 
     revenueByDateArray.sort((a, b) => new Date(a.date) - new Date(b.date));
 
-    // Tính tổng doanh thu
     const totalRevenueSum = revenueByDateArray.reduce(
       (acc, curr) => acc + curr.revenue,
       0
@@ -127,9 +126,8 @@ export default function DashboardAdmin() {
 
     setFilteredData(revenueByDateArray);
     setTotalProductsSold(totalQuantity);
-    setTotalRevenue(totalRevenueSum); // Set tổng doanh thu
+    setTotalRevenue(totalRevenueSum);
 
-    // Tìm sản phẩm bán chạy nhất
     const topProductEntry = Object.entries(productQuantityMap).sort(
       (a, b) => b[1] - a[1]
     )[0];
@@ -141,7 +139,6 @@ export default function DashboardAdmin() {
     }
   }, [orders, filterFrom, filterTo]);
 
-  // Component thẻ stat để tái sử dụng
   const StatCard = ({ title, value, subtitle }) => (
     <div className="bg-white shadow-lg rounded-xl p-6 border border-gray-200">
       <h3 className="text-sm font-medium text-gray-500 uppercase tracking-wider">
@@ -159,7 +156,6 @@ export default function DashboardAdmin() {
       <div className="sticky top-0 z-30 bg-white shadow-sm">
         <HdAdmin stylePro="btn-line" />
       </div>
-      {/* Thêm màu nền cho main để dễ nhìn hơn */}
       <main className="p-4 sm:p-6 md:p-8 max-w-7xl mx-auto min-h-screen bg-gray-50">
         <h1 className="text-2xl sm:text-3xl font-bold mb-6 text-gray-900 text-center">
           Revenue Dashboard
@@ -180,7 +176,6 @@ export default function DashboardAdmin() {
               value={filterFrom}
               max={filterTo}
               onChange={(e) => setFilterFrom(e.target.value)}
-              // Cập nhật styling cho input
               className="border border-gray-300 p-2 rounded-md w-full sm:w-48 shadow-sm focus:ring-blue-500 focus:border-blue-500"
             />
           </div>
@@ -197,7 +192,6 @@ export default function DashboardAdmin() {
               value={filterTo}
               min={filterFrom}
               onChange={(e) => setFilterTo(e.target.value)}
-              // Cập nhật styling cho input
               className="border border-gray-300 p-2 rounded-md w-full sm:w-48 shadow-sm focus:ring-blue-500 focus:border-blue-500"
             />
           </div>
@@ -207,9 +201,7 @@ export default function DashboardAdmin() {
         <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-10">
           <StatCard
             title="Total Revenue"
-            // Định dạng VND và đổi đơn vị
             value={`${totalRevenue.toLocaleString('vi-VN')} VND`}
-            // Dịch sang tiếng Việt
             subtitle="Từ đơn hàng hoàn thành"
           />
           <StatCard
@@ -233,7 +225,6 @@ export default function DashboardAdmin() {
         </section>
 
         {/* Biểu đồ doanh thu */}
-        {/* Cập nhật styling cho thẻ biểu đồ */}
         <section className="bg-white shadow-lg rounded-xl p-6 border border-gray-200 max-w-full overflow-x-auto">
           <h2 className="text-xl sm:text-2xl font-semibold mb-6 text-gray-900 text-center sm:text-left">
             Revenue by Date (Completed Orders)
@@ -256,7 +247,6 @@ export default function DashboardAdmin() {
                 <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
                 <XAxis dataKey="date" tickFormatter={(str) => str.slice(5)} />
                 <YAxis
-                  // Định dạng sang "tr" (triệu) cho ngắn gọn
                   tickFormatter={(value) =>
                     `${(value / 1000000).toLocaleString('vi-VN')} tr`
                   }
@@ -264,7 +254,6 @@ export default function DashboardAdmin() {
                   tickLine={false}
                 />
                 <Tooltip
-                  // Định dạng Tooltip sang VND
                   formatter={(value) =>
                     `${value.toLocaleString('vi-VN')} VND`
                   }
@@ -272,10 +261,9 @@ export default function DashboardAdmin() {
                 <Legend />
                 <Bar
                   dataKey="revenue"
-                  fill="#3B82F6" // Tailwind blue-500
-                  // Cập nhật tên đơn vị
+                  fill="#3B82F6"
                   name="Doanh thu (VND)"
-                  radius={[4, 4, 0, 0]} // Bo góc nhẹ cho thanh bar
+                  radius={[4, 4, 0, 0]}
                 />
               </BarChart>
             </ResponsiveContainer>

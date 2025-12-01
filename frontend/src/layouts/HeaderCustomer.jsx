@@ -1,6 +1,9 @@
 import React, { useState, useEffect, useRef } from "react";
 import "../Styles/main.css";
 import logo from "../assets/logo.png";
+// --- MỚI: Import ảnh avatar mặc định từ assets ---
+import defaultAvt from "../assets/avt.png"; 
+
 import { useNavigate } from "react-router-dom";
 import {
   getCart,
@@ -16,7 +19,7 @@ import Alert from "../components/Alert.jsx";
 import ChatBubble from "../components/ChatBubble.jsx"; 
 
 const Icon = ({ children, onClick, className = "" }) => (
-  <button onClick={onClick} className={`hover:scale-110 ${className}`}>
+  <button onClick={onClick} className={`hover:scale-110 transition-transform ${className}`}>
     {children}
   </button>
 );
@@ -26,24 +29,36 @@ const HeaderCustomer = ({ stylePro, styleCart, styleOrder }) => {
   const [backToTop, setBackToTop] = useState(false);
   const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
+  
+  const [showProfileMenu, setShowProfileMenu] = useState(false); 
+  
   const { info } = useInfo();
+  
   const [isClickNotifi, setIsClickNotifi] = useState(false);
   const [productCart, setProductCart] = useState([]);
 
   // --- LOGIC THÔNG BÁO ---
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
-  const [popupAlert, setPopupAlert] = useState(null); // Giờ sẽ là object: {id, message, type}
+  const [popupAlert, setPopupAlert] = useState(null);
   const isFirstNotificationFetch = useRef(true);
-  // -------------------------
+
+  const profileMenuRef = useRef(null);
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (profileMenuRef.current && !profileMenuRef.current.contains(event.target)) {
+        setShowProfileMenu(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   useEffect(() => {
     const handleScroll = () => {
       if (window.scrollY > 10) {
         setIsScrolled(true);
-        if (window.scrollY > 500) {
-          setBackToTop(true);
-        }
+        if (window.scrollY > 500) setBackToTop(true);
       } else {
         setIsScrolled(false);
         setBackToTop(false);
@@ -56,33 +71,21 @@ const HeaderCustomer = ({ stylePro, styleCart, styleOrder }) => {
   const handleLogout = async () => {
     try {
       const data = await logout();
-      
       if (data.success) {
         Swal.fire({
           icon: "success",
           title: "Đã đăng xuất",
-          text: "Bạn đã đăng xuất thành công.",
+          text: "Hẹn gặp lại bạn!",
           timer: 1500,
           showConfirmButton: false,
         }).then(() => {
           navigate("/login");
         });
       } else {
-        Swal.fire({
-          icon: "error",
-          title: "Đăng xuất thất bại",
-          text: data.message || "Đã có lỗi xảy ra.",
-          confirmButtonColor: "#4f46e5",
-        });
+        Swal.fire({ icon: "error", title: "Lỗi", text: data.message });
       }
     } catch (err) {
       console.error("Logout error:", err);
-      Swal.fire({
-        icon: "error",
-        title: "Lỗi...",
-        text: "Đã có lỗi xảy ra khi đăng xuất!",
-        confirmButtonColor: "#4f46e5",
-      });
     }
   };
 
@@ -99,59 +102,39 @@ const HeaderCustomer = ({ stylePro, styleCart, styleOrder }) => {
     try {
       const data = await loadInfoNotifications();
       if (!data.success) return;
-
-      const newNotifications = data.notifications;
-      const newUnreadCount = data.unreadCount;
-
-      setUnreadCount(newUnreadCount);
-
-      setNotifications((prevNotifications) => {
+      setUnreadCount(data.unreadCount);
+      setNotifications((prev) => {
         if (isFirstNotificationFetch.current) {
           isFirstNotificationFetch.current = false;
-          return newNotifications;
+          return data.notifications;
         }
-
-        if (newNotifications.length > 0) {
-          const newestNotif = newNotifications[0];
-          const isAlreadyPresent = prevNotifications.some(
-            (prevNotif) => prevNotif._id === newestNotif._id
-          );
-
+        if (data.notifications.length > 0) {
+          const newest = data.notifications[0];
+          const isExist = prev.some((n) => n._id === newest._id);
           const dismissedId = localStorage.getItem('dismissedNotificationId');
-
-          if (!isAlreadyPresent && newestNotif._id !== dismissedId) {
+          if (!isExist && newest._id !== dismissedId) {
             setPopupAlert({
-              id: newestNotif._id, 
-              message: `Thông báo mới: ${newestNotif.title}`,
+              id: newest._id, 
+              message: `Thông báo mới: ${newest.title}`,
               type: "info",
             });
           }
         }
-        return newNotifications;
+        return data.notifications;
       });
     } catch (err) {
-      console.error("Error loading notifications:", err);
+      console.error("Error notifications:", err);
     }
   };
 
-  // useEffect để fetch giỏ hàng (chỉ 1 lần khi load)
+  useEffect(() => { fetchCart(); }, []);
+  
   useEffect(() => {
-    fetchCart();
-  }, []);
-
-  // LẮNG NGHE SỰ KIỆN CẬP NHẬT GIỎ HÀNG
-  useEffect(() => {
-    const handleCartUpdate = () => {
-      console.log("Đã nhận tín hiệu cartUpdated! Đang fetch lại giỏ hàng...");
-      fetchCart();
-    };
+    const handleCartUpdate = () => fetchCart();
     window.addEventListener("cartUpdated", handleCartUpdate);
-    return () => {
-      window.removeEventListener("cartUpdated", handleCartUpdate);
-    };
+    return () => window.removeEventListener("cartUpdated", handleCartUpdate);
   }, []);
 
-  // useEffect để "lắng nghe" thông báo mới
   useEffect(() => {
     checkNotifications();
     const intervalId = setInterval(checkNotifications, 15000);
@@ -159,23 +142,12 @@ const HeaderCustomer = ({ stylePro, styleCart, styleOrder }) => {
   }, []);
 
   const handleNotificationClick = async (notification) => {
-    if (popupAlert) {
-      localStorage.setItem('dismissedNotificationId', popupAlert.id);
-    }
+    if (popupAlert) localStorage.setItem('dismissedNotificationId', popupAlert.id);
     setPopupAlert(null);
-
     if (!notification.isRead) {
-      setUnreadCount((prevCount) => prevCount - 1);
-      setNotifications((prevNotis) =>
-        prevNotis.map((n) =>
-          n._id === notification._id ? { ...n, isRead: true } : n
-        )
-      );
-      try {
-        await markNotificationAsRead(notification._id);
-      } catch (err) {
-        console.error("Failed to mark notification as read:", err);
-      }
+      setUnreadCount((prev) => prev - 1);
+      setNotifications((prev) => prev.map((n) => n._id === notification._id ? { ...n, isRead: true } : n));
+      try { await markNotificationAsRead(notification._id); } catch (e) {}
     }
   };
 
@@ -194,245 +166,170 @@ const HeaderCustomer = ({ stylePro, styleCart, styleOrder }) => {
         </div>
       )}
 
-      <header
-        className={`relative flex gap-5 p-5 bg-white ${
-          isScrolled ? "shadow-md" : ""
-        } `}
-      >
+      <header className={`relative flex gap-5 p-4 md:p-5 bg-white items-center justify-between ${isScrolled ? "shadow-md sticky top-0 z-40" : ""}`}>
         {backToTop && <BackToTop />}
         
-        <button className="center">
+        {/* LOGO */}
+        <button className="center shrink-0">
           <img
             src={logo}
             alt="logo"
             onClick={() => navigate("/dashboard-customer")}
-            className="min-w-[127px] h-[55px] overflow-hidden hover:scale-105"
+            className="w-[100px] md:w-[127px] h-auto object-contain hover:scale-105 transition-transform"
           />
         </button>
 
-        <BoxSearch></BoxSearch>
+        {/* SEARCH BOX */}
+        <div className="flex-1 max-w-2xl mx-4">
+            <BoxSearch />
+        </div>
 
         {/* =================== GIAO DIỆN MÁY TÍNH =================== */}
-        <div className="center gap-10 max-lg:hidden ">
-          <Icon
-            className={`Orders ${styleOrder} center`}
-            onClick={() => navigate("/my-orders")}
-          >
-            {/* ... (Orders SVG) ... */}
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              fill="none"
-              viewBox="0 0 24 24"
-              strokeWidth="1.5"
-              stroke="currentColor"
-              className="w-6 h-6"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 002.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 00-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 00.75-.75 2.25 2.25 0 00-.1-.664m-5.8 0A2.251 2.251 0 0113.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25zM6.75 12h.008v.008H6.75V12zm0 3h.008v.008H6.75V15zm0 3h.008v.008H6.75V18z"
-              />
+        <div className="center gap-6 lg:gap-8 max-lg:hidden shrink-0">
+          
+          {/* ORDERS */}
+          <Icon className={`Orders ${styleOrder} center flex-col gap-1`} onClick={() => navigate("/my-orders")}>
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="w-6 h-6">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 002.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 00-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 00.75-.75 2.25 2.25 0 00-.1-.664m-5.8 0A2.251 2.251 0 0113.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25zM6.75 12h.008v.008H6.75V12zm0 3h.008v.008H6.75V15zm0 3h.008v.008H6.75V18z" />
             </svg>
-            Orders
+            <span className="text-xs font-medium">Orders</span>
           </Icon>
-          <div>
-            <Icon
-              className="Notification btn-line relative"
-              onClick={() => {
-                setIsClickNotifi(!isClickNotifi);
-              }}
-            >
-              {/* ... (Notification SVG) ... */}
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                fill="none"
-                viewBox="0 0 24 24"
-                strokeWidth="1.5"
-                stroke="currentColor"
-                className="w-6 h-6"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0"
-                />
+
+          {/* NOTIFICATION */}
+          <div className="relative">
+            <Icon className="Notification btn-line relative flex-col gap-1" onClick={() => setIsClickNotifi(!isClickNotifi)}>
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="w-6 h-6">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0" />
               </svg>
-              {unreadCount > 0 && (
-                <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-600 rounded-full border-2 border-white"></span>
-              )}
+              {unreadCount > 0 && <span className="absolute top-0 right-2 w-2.5 h-2.5 bg-red-600 rounded-full ring-2 ring-white"></span>}
+              <span className="text-xs font-medium">Notify</span>
             </Icon>
-            <div
-              className={`absolute right-24 mt-2 w-80 max-h-64 bg-white rounded-xl shadow-xl overflow-y-auto z-50 ${
-                isClickNotifi ? "block" : "hidden"
-              }`}
-            >
-              <h2 className="px-4 py-2 text-lg font-semibold text-sky-600 border-b">
-                {notifications.length > 0
-                  ? "Notification"
-                  : "No notification "}
-              </h2>
-              {notifications.map((noti) => (
-                <div
-                  key={noti._id}
-                  className={`flex items-start gap-3 px-4 py-2 border-b cursor-pointer ${
-                    noti.isRead
-                      ? "bg-white hover:bg-gray-50"
-                      : "bg-sky-50 hover:bg-sky-100 font-medium"
-                  }`}
-                  onClick={() => handleNotificationClick(noti)}
-                >
-                  <div
-                    className={`p-2 rounded-full ${
-                      noti.isRead
-                        ? "bg-gray-100 text-gray-500"
-                        : "bg-sky-100 text-sky-600"
-                    }`}
-                  >
-                    {/* ... (Notification item SVG) ... */}
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      strokeWidth={1.5}
-                      stroke="currentColor"
-                      className="w-5 h-5"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022 23.848 23.848 0 005.455 1.31m5.714 0a3 3 0 11-5.714 0"
-                      />
-                    </svg>
-                  </div>
-                  <div className="flex-1">
-                    <h3 className="text-sm">{noti.title}</h3>
-                    <p className="text-sm text-gray-600 line-clamp-2">
-                      {noti.content}
-                    </p>
-                  </div>
-                  {!noti.isRead && (
-                    <span className="w-2 h-2 bg-sky-500 rounded-full self-center"></span>
-                  )}
-                </div>
-              ))}
+            {/* Dropdown Notification */}
+            <div className={`absolute right-0 mt-3 w-80 max-h-96 bg-white rounded-xl shadow-xl overflow-hidden z-50 border border-gray-100 origin-top-right transition-all duration-200 ${isClickNotifi ? "opacity-100 scale-100" : "opacity-0 scale-95 pointer-events-none"}`}>
+               <h2 className="px-4 py-3 text-sm font-bold text-gray-700 border-b bg-gray-50">Notifications</h2>
+               <div className="overflow-y-auto max-h-80">
+                  {notifications.map((noti) => (
+                    <div key={noti._id} className={`flex gap-3 px-4 py-3 border-b hover:bg-gray-50 cursor-pointer transition-colors ${!noti.isRead ? "bg-sky-50/50" : ""}`} onClick={() => handleNotificationClick(noti)}>
+                       <div className={`shrink-0 w-2 h-2 mt-2 rounded-full ${!noti.isRead ? "bg-sky-500" : "bg-transparent"}`}></div>
+                       <div>
+                          <h3 className={`text-sm ${!noti.isRead ? "font-bold text-gray-900" : "font-medium text-gray-600"}`}>{noti.title}</h3>
+                          <p className="text-xs text-gray-500 mt-1 line-clamp-2">{noti.content}</p>
+                       </div>
+                    </div>
+                  ))}
+                  {notifications.length === 0 && <p className="text-center py-6 text-gray-500 text-sm">No notifications</p>}
+               </div>
             </div>
           </div>
-          <Icon
-            className={`Cart ${styleCart} flex items-center relative`}
-            onClick={() => navigate("/my-cart")}
-          >
-            {/* ... (Cart SVG) ... */}
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              fill="none"
-              viewBox="0 0 24 24"
-              strokeWidth="1.5"
-              stroke="currentColor"
-              className="w-6 h-6"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M2.25 3h1.386c.51 0 .955.343 1.087.835l.383 1.437M7.5 14.25a3 3 0 00-3 3h15.75m-12.75-3h11.218c1.121-2.3 2.1-4.684 2.924-7.138a60.114 60.114 0 00-16.536-1.84M7.5 14.25L5.106 5.272M6 20.25a.75.75 0 11-1.5 0 .75.75 0 011.5 0zm12.75 0a.75.75 0 11-1.5 0 .75.75 0 011.5 0z"
-              />
+
+          {/* CART */}
+          <Icon className={`Cart ${styleCart} relative flex-col gap-1`} onClick={() => navigate("/my-cart")}>
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="w-6 h-6">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 3h1.386c.51 0 .955.343 1.087.835l.383 1.437M7.5 14.25a3 3 0 00-3 3h15.75m-12.75-3h11.218c1.121-2.3 2.1-4.684 2.924-7.138a60.114 60.114 0 00-16.536-1.84M7.5 14.25L5.106 5.272M6 20.25a.75.75 0 11-1.5 0 .75.75 0 011.5 0zm12.75 0a.75.75 0 11-1.5 0 .75.75 0 011.5 0z" />
             </svg>
-            Cart
-            {productCart && productCart.length > 0 && (
-              <div className="w-4 h-4 bg-sky-500 rounded-full text-white  center absolute -top-1 left-[10px]">
-                <p className="text-[10px]">{productCart.length}</p>
+            {productCart?.length > 0 && (
+              <span className="absolute -top-1 right-1 bg-red-500 text-white text-[10px] font-bold w-4 h-4 flex items-center justify-center rounded-full shadow-sm">
+                {productCart.length}
+              </span>
+            )}
+            <span className="text-xs font-medium">Cart</span>
+          </Icon>
+
+          {/* --- AVATAR USER & DROPDOWN --- */}
+          <div className="relative" ref={profileMenuRef}>
+            <button 
+              onClick={() => setShowProfileMenu(!showProfileMenu)} 
+              className="flex items-center gap-2 focus:outline-none group"
+            >
+              <img
+                src={info?.avatar || defaultAvt}
+                alt="User"
+                className="w-10 h-10 rounded-full object-cover border-2 border-transparent group-hover:border-sky-500 transition-all shadow-sm"
+              />
+              <div className="text-left hidden xl:block">
+                  <p className="text-sm font-bold text-gray-700 group-hover:text-sky-600 transition-colors">
+                    {info?.username ? info.username.split(" ")[0] : "User"}
+                  </p>
+                  <p className="text-[10px] text-gray-500">Member</p>
+              </div>
+            </button>
+
+            {/* Menu thả xuống Desktop */}
+            {showProfileMenu && (
+              <div className="absolute right-0 mt-3 w-56 bg-white rounded-xl shadow-xl border border-gray-100 py-2 z-50 animate-fade-in-up">
+                <div className="px-4 py-3 border-b border-gray-100 mb-2 bg-gray-50/50">
+                   <p className="text-sm font-bold text-gray-800 truncate">{info?.username || "Guest"}</p>
+                   <p className="text-xs text-gray-500 truncate">{info?.email || "No email"}</p>
+                </div>
+                <button 
+                  onClick={() => navigate("/profile-customer")}
+                  className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-sky-50 hover:text-sky-600 flex items-center gap-3 transition-colors"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 text-gray-400">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
+                  </svg>
+                  My Profile
+                </button>
+                <div className="border-t border-gray-100 my-1"></div>
+                <button 
+                  onClick={handleLogout}
+                  className="w-full text-left px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 flex items-center gap-3 transition-colors font-medium"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15M12 9l-3 3m0 0l3 3m-3-3h12.75" />
+                  </svg>
+                  Log out
+                </button>
               </div>
             )}
-          </Icon>
-
-          <Icon
-            className={`Profile ${stylePro}`}
-            onClick={() => navigate("/profile-customer")}
-          >
-            {/* ... (Profile SVG) ... */}
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              fill="none"
-              viewBox="0 0 24 24"
-              strokeWidth="1.5"
-              stroke="currentColor"
-              className="w-6 h-6"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z"
-              />
-            </svg>
-          </Icon>
-
-          <button
-            onClick={handleLogout}
-            className="bg-red-600 text-white px-5 py-2 rounded-lg whitespace-nowrap font-medium hover:bg-red-700 transition-colors duration-200"
-          >
-            Log out
-          </button>
+          </div>
         </div>
 
         {/* =================== GIAO DIỆN DI ĐỘNG =================== */}
-        <div className="flex items-center ml-auto lg:hidden text-sky-600">
-          <Icon onClick={() => setMenuOpen(!menuOpen)}>
-            {/* ... (Mobile Menu Icon) ... */}
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              fill="none"
-              viewBox="0 0 24 24"
-              strokeWidth="1.5"
-              stroke="currentColor"
-              className="w-8 h-8"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5"
-              />
-            </svg>
-          </Icon>
+        <div className="lg:hidden flex items-center">
+           <button onClick={() => setMenuOpen(!menuOpen)} className="text-sky-600 p-2">
+             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="w-8 h-8">
+               <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
+             </svg>
+           </button>
         </div>
 
-        {/* *** ĐÂY LÀ PHẦN ĐÃ ĐƯỢC SỬA *** */}
+        {/* MENU MOBILE */}
         {menuOpen && (
-          <div className="absolute top-20 right-5 mt-2 w-40 bg-white shadow-lg rounded-lg py-2  flex-col z-50 max-lg:flex hidden">
-            <button
-              onClick={() => {
-                navigate("/my-orders");
-                setMenuOpen(false);
-              }}
-              className="px-4 py-2 hover:bg-gray-100 text-left"
-            >
-              Orders
+          <div className="absolute top-20 right-5 mt-2 w-56 bg-white shadow-xl rounded-xl py-2 flex flex-col z-50 lg:hidden border border-gray-100 animate-fade-in-up">
+            <div className="px-4 py-3 border-b mb-1 bg-gray-50 flex items-center gap-3">
+               <img 
+                 // --- SỬA: Dùng defaultAvt đã import ---
+                 src={info?.avatar || defaultAvt} 
+                 className="w-8 h-8 rounded-full object-cover" 
+                 alt="avt" 
+               />
+               <div className="overflow-hidden">
+                 <p className="text-sm font-bold text-gray-800 truncate">{info?.username || "User"}</p>
+                 <p className="text-xs text-gray-500 truncate">Member</p>
+               </div>
+            </div>
+
+            <button onClick={() => { navigate("/my-orders"); setMenuOpen(false); }} className="px-4 py-3 hover:bg-gray-50 text-left text-sm font-medium text-gray-700 flex items-center gap-3">
+              <span>📦</span> My Orders
             </button>
-            <button
-              onClick={() => {
-                navigate("/my-cart");
-                setMenuOpen(false);
-              }}
-              className="px-4 py-2 hover:bg-gray-100 text-left"
-            >
-              Cart
+            <button onClick={() => { navigate("/my-cart"); setMenuOpen(false); }} className="px-4 py-3 hover:bg-gray-50 text-left text-sm font-medium text-gray-700 flex items-center gap-3">
+              <span>🛒</span> Shopping Cart
             </button>
-            <button
-              onClick={() => {
-                navigate("/profile-customer");
-                setMenuOpen(false);
-              }}
-              className="px-4 py-2 hover:bg-gray-100 text-left"
-            >
-              Profile (User)
+            <button onClick={() => { navigate("/profile-customer"); setMenuOpen(false); }} className="px-4 py-3 hover:bg-gray-50 text-left text-sm font-medium text-gray-700 flex items-center gap-3">
+              <span>👤</span> My Profile
             </button>
-            <button
-              onClick={() => {
-                // Mở thông báo và đóng menu
-                setIsClickNotifi(true); 
-                setMenuOpen(false);
-              }}
-              className="px-4 py-2 hover:bg-gray-100 text-left"
-            >
-              Notification
+            <button onClick={() => { setIsClickNotifi(true); setMenuOpen(false); }} className="px-4 py-3 hover:bg-gray-50 text-left text-sm font-medium text-gray-700 flex items-center gap-3">
+              <span>🔔</span> Notifications
+            </button>
+            
+            <div className="border-t my-1"></div>
+            
+            <button onClick={handleLogout} className="px-4 py-3 hover:bg-red-50 text-left text-sm font-bold text-red-600 flex items-center gap-3">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
+                 <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15M12 9l-3 3m0 0l3 3m-3-3h12.75" />
+              </svg>
+              Log out
             </button>
           </div>
         )}
