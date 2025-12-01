@@ -5,15 +5,73 @@ import Cart from "../models/Cart.js";
 import Order from "../models/Order.js";
 import mongoose from "mongoose";
 import bcrypt from "bcrypt";
-import { sendPasswordResetEmail } from  "../services/emailService.js";
+// [CITE: emailService.js] Import thêm sendVerificationEmail
+import { sendPasswordResetEmail, sendVerificationEmail } from "../services/emailService.js";
 
-//!Đăng ký
+// [MỚI] Biến lưu mã xác thực tạm thời (RAM)
+// Trong thực tế production nên dùng Redis, nhưng Map là đủ cho bài tập/đồ án
+const verificationCodes = new Map();
+
+// *** [MỚI] HÀM 1: Gửi mã xác thực đăng ký ***
+export const handleSendVerifyEmail = async (req, res) => {
+  const { email } = req.body;
+
+  if (!email) return res.status(400).json({ success: false, message: "Email is required" });
+
+  try {
+    // 1. Kiểm tra xem email đã tồn tại trong DB chưa
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      return res.json({ success: false, message: "Email already exists" });
+    }
+
+    // 2. Tạo mã 6 số ngẫu nhiên
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
+
+    // 3. Lưu mã vào bộ nhớ tạm
+    verificationCodes.set(email, code);
+
+    // 4. Gọi hàm gửi mail từ emailService.js
+    const emailResult = await sendVerificationEmail(email, code);
+
+    if (emailResult.success) {
+        return res.json({ success: true, message: "Verification code sent" });
+    } else {
+        return res.status(500).json({ success: false, message: "Failed to send email via service" });
+    }
+
+  } catch (error) {
+    console.error("Controller Error:", error);
+    return res.status(500).json({ success: false, message: "Server error" });
+  }
+};
+
+// *** [MỚI] HÀM 2: Kiểm tra mã xác thực người dùng nhập ***
+export const handleVerifyEmailCode = async (req, res) => {
+  const { email, code } = req.body;
+
+  if (!email || !code) {
+    return res.status(400).json({ success: false, message: "Missing info" });
+  }
+
+  // Lấy mã đã lưu trong RAM
+  const storedCode = verificationCodes.get(email);
+
+  // So sánh
+  if (storedCode === code) {
+    verificationCodes.delete(email); // Xóa mã ngay sau khi dùng (chỉ dùng 1 lần)
+    return res.json({ success: true, message: "Verified successfully" });
+  } else {
+    return res.json({ success: false, message: "Invalid or expired code" });
+  }
+};
+
+
+//!Đăng ký (GIỮ NGUYÊN LOGIC CŨ - Frontend sẽ gọi verify xong mới gọi cái này)
 export const handleRegister = async (req, res) => {
   try {
-    // THAY ĐỔI: Thêm 'email'
     const { username, email, password, position } = req.body;
 
-    // THAY ĐỔI: Kiểm tra email
     const existingEmail = await User.findOne({ email });
     if (existingEmail) {
       return res.status(409).json({
@@ -30,12 +88,11 @@ export const handleRegister = async (req, res) => {
       });
     }
 
-    // THAY ĐỔI: Thêm 'email' khi tạo user
     const user = new User({ username, email, password, position });
     await user.save();
     res.status(201).json({ success: true });
   } catch (err) {
-    console.error(err); // Thêm log lỗi
+    console.error(err); 
     res.status(500).json({
       success: false,
       message: "Server error during sign up",
@@ -64,8 +121,6 @@ export const handleLogin = async (req, res) => {
     res.status(500).json({ success: false, message: err });
   }
 };
-
-
 
 //!Đăng xuất
 export const handleLogout = async (req, res) => {
@@ -127,7 +182,7 @@ export const updateInfo = async (req, res) => {
     await User.findByIdAndUpdate(req.session.user.id, updates);
     res.json({ success: true, message: "Update Successfully" });
   } catch (err) {
-    res.status(500).json({ success: false, message: "Update failed" }); // Sửa message.err
+    res.status(500).json({ success: false, message: "Update failed" });
   }
 };
 
@@ -149,7 +204,7 @@ export const changePassword = async (req, res) => {
         .json({ success: false, message: "Incorrect password" });
     }
 
-    user.password = newPassword; // Model User của bạn nên có hook 'pre-save' để hash mật khẩu
+    user.password = newPassword; 
     await user.save();
 
     res.json({ success: true, message: "Password updated successfully" });
@@ -159,6 +214,7 @@ export const changePassword = async (req, res) => {
     });
   }
 };
+
 //!Check username exist
 export const usernameExist = async (req, res) => {
   try {
@@ -166,7 +222,7 @@ export const usernameExist = async (req, res) => {
     const user = await User.findOne({ username });
     if (!user)
       return res
-        .status(401) // 401 không hợp lý, có thể dùng 200 và success: false
+        .status(200) // Đã sửa lại thành 200 cho frontend dễ xử lý
         .json({ success: false, message: "Username is not exist" });
     else res.json({ success: true });
   } catch (err) {
@@ -174,7 +230,6 @@ export const usernameExist = async (req, res) => {
   }
 };
 
-// THAY THẾ: Logic Reset Password
 
 //!Reset password (BƯỚC 1: Yêu cầu gửi mã)
 export const handleForgotPassword = async (req, res) => {
@@ -195,7 +250,6 @@ export const handleForgotPassword = async (req, res) => {
 
     // === GỌI EMAIL SERVICE TẠI ĐÂY ===
     await sendPasswordResetEmail(user.email, resetCode);
-    // ===================================
     
     res.json({ success: true, message: "Password reset code sent to email." });
 
@@ -215,7 +269,7 @@ export const handleResetPassword = async (req, res) => {
     const user = await User.findOne({
       email,
       resetPasswordToken: code,
-      resetPasswordExpires: { $gt: Date.now() }, // $gt = greater than (còn hạn)
+      resetPasswordExpires: { $gt: Date.now() }, 
     });
 
     if (!user) {
@@ -224,9 +278,7 @@ export const handleResetPassword = async (req, res) => {
         .json({ success: false, message: "Invalid or expired reset code." });
     }
 
-    // Đặt lại mật khẩu (hook 'pre-save' trong Model sẽ hash)
     user.password = newPassword;
-    // Xóa mã sau khi dùng
     user.resetPasswordToken = undefined;
     user.resetPasswordExpires = undefined; 
     
@@ -280,7 +332,6 @@ export const addStaff = async (req, res) => {
         message: "Username already exists",
       });
     }
-    // Bạn cũng nên kiểm tra email tồn tại ở đây
     const existingEmail = await User.findOne({ email });
     if (existingEmail) {
       return res.status(409).json({
@@ -309,13 +360,6 @@ export const addStaff = async (req, res) => {
     });
   }
 };
-
-// ... (Tất cả các hàm khác của bạn từ getStaffs trở đi giữ nguyên) ...
-// ... (getStaffs, updateInfoByAdmin, deleteUser, addProducts, ...)
-// ... (getProducts, updateProductByAdmin, deleteProducts, ...)
-// ... (addNotification, getNotifications, deleteNotifications, ...)
-// ... (addToCart, getCart, deleteItem, ...)
-// ... (addOrder, getOrders, updateOrder, getOrdersByAdmin)
 
 export const getStaffs = async (req, res) => {
   try {
@@ -385,7 +429,7 @@ export const addProducts = async (req, res) => {
       image,
       quantity,
       description,
-      category, // <--- THÊM DÒNG NÀY
+      category, 
     } = req.body;
     const existingProduct = await Product.findOne({ productId });
     if (existingProduct) {
@@ -477,7 +521,7 @@ export const deleteProducts = async (req, res) => {
     console.log("Product ID received:", req.body.productId);
     const deleted = await Product.findOneAndDelete({
       productId: req.body.productId,
-    }); // kiểm tra đúng field chưa
+    }); 
     if (!deleted) {
       return res
         .status(404)
@@ -485,7 +529,7 @@ export const deleteProducts = async (req, res) => {
     }
     res.json({ success: true, message: "Product deleted successfully" });
   } catch (error) {
-    console.error("Delete error:", error); // log ra terminal để kiểm tra lỗi thật sự
+    console.error("Delete error:", error); 
     res.status(500).json({ success: false, message: "Server error" });
   }
 };
@@ -553,7 +597,7 @@ export const deleteNotifications = async (req, res) => {
 
 export const markNotificationAsRead = async (req, res) => {
   try {
-    const { id } = req.body; // Lấy ID của thông báo cần đánh dấu
+    const { id } = req.body; 
 
     if (!id) {
       return res
@@ -563,7 +607,7 @@ export const markNotificationAsRead = async (req, res) => {
 
     const notification = await Notification.findByIdAndUpdate(
       id,
-      { isRead: true }, // Cập nhật trạng thái 'đã xem'
+      { isRead: true }, 
       { new: true }
     );
 
@@ -710,7 +754,7 @@ export const getOrders = async (req, res) => {
 
     const orders = await Order.find({
       userId: new mongoose.Types.ObjectId(userId),
-    }); // userId là string, trùng với Order.userId
+    }); 
 
     if (!orders || orders.length === 0) {
       return res.json({

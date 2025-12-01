@@ -324,3 +324,30 @@ export const updateOrder = async (order) => {
   });
   return res.json();
 };
+
+export const checkEmailExist = async (email) => {
+  const res = await fetch("http://localhost:5000/api/check-email", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email }),
+  });
+  return res.json();
+};
+
+export const sendVerifyEmail = async (email) => {
+  const res = await fetch("http://localhost:5000/api/send-verify-email", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email }),
+  });
+  return res.json();
+};
+
+export const verifyEmailCode = async (email, code) => {
+  const res = await fetch("http://localhost:5000/api/verify-email", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, code }),
+  });
+  return res.json();
+};
