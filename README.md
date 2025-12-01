@@ -99,79 +99,87 @@ Dự án này được chia làm 2 phần: `frontend` và `backend`. Bạn cần
 ---
 
 ## 📂 Cấu trúc thư mục 
-/TechSyncShop
-├── package.json 
-├── README.md 
+```text
+TechSyncShop/
+├── package.json
+├── README.md
 │
-├── /backend 
-│   ├── server.js 
-│   ├── package.json 
-│   │
-│   ├── /config 
-│   │   └── db.js 
-│   │
-│   ├── /controllers 
-│   │   ├── authController.js 
-│   │   └── ChatController.js 
-│   │
-│   ├── /models 
-│   │   ├── Cart.js 
-│   │   ├── Notification.js 
-│   │   ├── Order.js 
-│   │   ├── Product.js 
-│   │   └── User.js 
-│   │
-│   ├── /public 
-│   │   └── /uploads 
-│   │       └── (Chứa các file ảnh đã tải lên) 
-│   │
-│   ├── /routes 
-│   │   └── auth.js 
-│   │
-│   └── /services 
-│       └── emailService.js 
+├── backend/
+│   ├── package.json
+│   ├── server.js
+│   ├── config/
+│   │   └── db.js
+│   ├── controllers/
+│   │   ├── authController.js
+│   │   └── ChatController.js
+│   ├── models/
+│   │   ├── Cart.js
+│   │   ├── Notification.js
+│   │   ├── Order.js
+│   │   ├── Product.js
+│   │   └── User.js
+│   ├── public/
+│   │   └── uploads/
+│   ├── routes/
+│   │   └── auth.js
+│   └── services/
+│       └── emailService.js
 │
-└── /frontend 
-    ├── index.html 
-    ├── package.json 
-    │
-    └── /src 
-        ├── App.jsx 
-        ├── main.jsx 
-        ├── index.css 
-        │
-        ├── /assets 
-        │   └── (Chứa các file ảnh tĩnh, logo...) 
-        │
-        ├── /components 
-        │   ├── Alert.jsx 
-        │   ├── ChatBubble.jsx 
-        │   └── ... (Các component khác) 
-        │
-        ├── /Data 
-        │   └── Countries.js 
-        │
-        ├── /Function 
-        │   ├── CheckUser.js 
-        │   └── UseInfoUser.js 
-        │
-        ├── /layouts 
-        │   ├── Footer.jsx 
-        │   ├── Header.jsx 
-        │   └── ...
-        │
-        ├── /pages 
-        │   ├── LoginPage.jsx 
-        │   ├── SignupPage.jsx 
-        │   ├── CartPage.jsx 
-        │   ├── DashboardAdmin.jsx 
-        │   └── ... (Các trang khác)
-        │
-        ├── /services 
-        │   └── handleAPI.js 
-        │
-        ├── /Styles 
-        │   └── main.css 
-        │
-        └── /utils 
-            └── format.js 
+└── frontend/
+    ├── package.json
+    ├── index.html
+    └── src/
+        ├── App.jsx
+        ├── main.jsx
+        ├── index.css
+        ├── assets/
+        ├── components/
+        │   ├── Button/
+        │   │   ├── BackToTop.jsx
+        │   │   └── BoxSearch.jsx
+        │   ├── Alert.jsx
+        │   ├── ChatBubble.jsx
+        │   ├── DetailProductModal.jsx
+        │   ├── Infomation.jsx
+        │   ├── InputUser.jsx
+        │   ├── ListProduct.jsx
+        │   ├── Product.jsx
+        │   └── SearchableSelect.jsx
+        ├── Data/
+        │   └── Countries.js
+        ├── Function/
+        │   ├── CheckUser.js
+        │   └── UseInfoUser.js
+        ├── layouts/
+        │   ├── Footer.jsx
+        │   ├── Header.jsx
+        │   ├── HeaderAdmin.jsx
+        │   └── HeaderCustomer.jsx
+        ├── pages/
+        │   ├── CartPage.jsx
+        │   ├── ChangePass.jsx
+        │   ├── CheckoutPage.jsx
+        │   ├── DashboardAdmin.jsx
+        │   ├── DashBoardCustomer.jsx
+        │   ├── ErrorPage.jsx
+        │   ├── LoadingPage.jsx
+        │   ├── LoginPage.jsx
+        │   ├── ManageCustomer.jsx
+        │   ├── ManageNoti.jsx
+        │   ├── ManageOrder.jsx
+        │   ├── ManageProduct.jsx
+        │   ├── ManageStaff.jsx
+        │   ├── OrderPage.jsx
+        │   ├── ProfileAdmin.jsx
+        │   ├── ProfileCustomer.jsx
+        │   ├── ResetPassword.jsx
+        │   ├── SearchPage.jsx
+        │   └── SignupPage.jsx
+        ├── services/
+        │   └── handleAPI.js
+        ├── Styles/
+        │   └── main.css
+        └── utils/
+            └── format.js
+```
+
