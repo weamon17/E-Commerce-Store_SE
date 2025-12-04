@@ -131,7 +131,6 @@ const LoadingPage = () => {
                 initial={{ opacity: 0, y: 50 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.5, delay: idx * 0.1 }}
-                onClick={() => navigate("/products")} // Navigate to products page
               >
                 <img
                   src={category.image}

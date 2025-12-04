@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import "../Styles/main.css";
 import logo from "../assets/logo.png";
-// --- MỚI: Import ảnh avatar mặc định từ assets ---
 import defaultAvt from "../assets/avt.png"; 
 
 import { useNavigate } from "react-router-dom";
@@ -44,6 +43,7 @@ const HeaderCustomer = ({ stylePro, styleCart, styleOrder }) => {
   const isFirstNotificationFetch = useRef(true);
 
   const profileMenuRef = useRef(null);
+  
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (profileMenuRef.current && !profileMenuRef.current.contains(event.target)) {
@@ -151,6 +151,12 @@ const HeaderCustomer = ({ stylePro, styleCart, styleOrder }) => {
     }
   };
 
+  // Hàm xử lý khi ảnh lỗi (fallback image)
+  const handleImageError = (e) => {
+    e.target.onerror = null; 
+    e.target.src = defaultAvt;
+  };
+
   return (
     <>
       {popupAlert && (
@@ -241,9 +247,11 @@ const HeaderCustomer = ({ stylePro, styleCart, styleOrder }) => {
               onClick={() => setShowProfileMenu(!showProfileMenu)} 
               className="flex items-center gap-2 focus:outline-none group"
             >
+              {/* === FIX: Thêm onError để xử lý ảnh lỗi === */}
               <img
                 src={info?.avatar || defaultAvt}
                 alt="User"
+                onError={handleImageError}
                 className="w-10 h-10 rounded-full object-cover border-2 border-transparent group-hover:border-sky-500 transition-all shadow-sm"
               />
               <div className="text-left hidden xl:block">
@@ -298,9 +306,10 @@ const HeaderCustomer = ({ stylePro, styleCart, styleOrder }) => {
         {menuOpen && (
           <div className="absolute top-20 right-5 mt-2 w-56 bg-white shadow-xl rounded-xl py-2 flex flex-col z-50 lg:hidden border border-gray-100 animate-fade-in-up">
             <div className="px-4 py-3 border-b mb-1 bg-gray-50 flex items-center gap-3">
+               {/* === FIX: Thêm onError cho Mobile === */}
                <img 
-                 // --- SỬA: Dùng defaultAvt đã import ---
                  src={info?.avatar || defaultAvt} 
+                 onError={handleImageError}
                  className="w-8 h-8 rounded-full object-cover" 
                  alt="avt" 
                />
